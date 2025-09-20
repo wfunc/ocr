@@ -1,0 +1,21 @@
+# Git
+.git
+.gitignore
+
+# Python virtualenvs
+venv/
+*.pyc
+__pycache__/
+
+# Go build artifacts
+ocrserver
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+coverage.out
+
+# Others
+.DS_Store

@@ -1,0 +1,4 @@
+ddddocr
+requests
+Pillow
+cairosvg
