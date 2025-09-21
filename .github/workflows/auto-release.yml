@@ -82,15 +82,15 @@ jobs:
             mkdir -p "${PKG_DIR}"
             cp "dist/${BIN}" "${PKG_DIR}/ocr-server"
             cp ocr.py requirements.txt "${PKG_DIR}/"
-            cat > "${PKG_DIR}/README.txt" <<'EOF'
-OCR 服务部署包
-================
-
-运行步骤：
-1. 安装/确保存在 Python 3.12 及 requirements.txt 中依赖。
-2. 在解压目录运行 `./ocr-server`，服务默认监听 8080 端口。
-3. 通过 GET/POST /ocr 接口传入图片 URL 或 Base64 数据。
-EOF
+            printf '%s\n' \
+              'OCR 服务部署包' \
+              '================' \
+              '' \
+              '运行步骤：' \
+              '1. 安装/确保存在 Python 3.12 及 requirements.txt 中依赖。' \
+              '2. 在解压目录运行 ./ocr-server，服务默认监听 8080 端口。' \
+              '3. 通过 GET/POST /ocr 接口传入图片 URL 或 Base64 数据。' \
+              > "${PKG_DIR}/README.txt"
             tar -czf "dist/ocr-server-${VERSION}-linux-${ARCH}.tar.gz" -C "${PKG_DIR}" .
             rm -rf "${PKG_DIR}" "dist/${BIN}"
           done
