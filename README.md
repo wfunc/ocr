@@ -20,8 +20,15 @@ docker run --rm -p 8080:8080 ocr-server:local
 项目已内置 GitHub Actions（`.github/workflows/auto-release.yml`），当推送到 `main` 分支或手动触发工作流时，会自动：
 
 - 递增 `VERSION` 文件并生成新的 `vX.Y.Z` 标签
-- 构建并推送多架构镜像到 GitHub Container Registry（`ghcr.io/<your-username>/wfunc-ocr`）
+- 为 Linux `amd64` 与 `arm64` 交叉编译二进制包并附加到 Release
+- 构建并推送多架构镜像到 GitHub Container Registry（`ghcr.io/<your-username>/wfunc-ocr`）和 Docker Hub（`docker.io/<dockerhub-username>/ocr`）
 - 创建对应的 GitHub Release
+
+Release 附件包含：
+
+- `ocr-server-<version>-linux-amd64.tar.gz`
+- `ocr-server-<version>-linux-arm64.tar.gz`
+- `SHA256SUMS`
 
 首次使用前，确保仓库启用了 GitHub Packages，并遵循 GitHub 的权限设置即可，无需额外 Secrets。
 

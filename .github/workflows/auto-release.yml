@@ -46,7 +46,7 @@ jobs:
           CURRENT_VERSION=$(printf '%s\n%s\n' "$TAG_VERSION" "$FILE_VERSION" | sort -V | tail -n1)
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
           MAJOR=${MAJOR:-0}
-          MINOR=${MINOR:-1}
+          MINOR=${MINOR:-0}
           PATCH=${PATCH:-0}
           PATCH=$((PATCH + 1))
           NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
@@ -63,9 +63,38 @@ jobs:
           VERSION="${{ steps.bump.outputs.version }}"
           git add VERSION
           git commit -m "chore: release v${VERSION} [skip ci]"
-          git tag "v${VERSION}"
-          git push origin HEAD
-          git push origin "v${VERSION}"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: false
+
+      - name: Build release packages
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.bump.outputs.version }}"
+          mkdir -p dist
+          for ARCH in amd64 arm64; do
+            BIN="ocr-server-linux-${ARCH}"
+            GOOS=linux GOARCH="${ARCH}" CGO_ENABLED=0 go build -o "dist/${BIN}" ./main.go
+            PKG_DIR="dist/pkg-${ARCH}"
+            mkdir -p "${PKG_DIR}"
+            cp "dist/${BIN}" "${PKG_DIR}/ocr-server"
+            cp ocr.py requirements.txt "${PKG_DIR}/"
+            cat > "${PKG_DIR}/README.txt" <<'EOF'
+OCR 服务部署包
+================
+
+运行步骤：
+1. 安装/确保存在 Python 3.12 及 requirements.txt 中依赖。
+2. 在解压目录运行 `./ocr-server`，服务默认监听 8080 端口。
+3. 通过 GET/POST /ocr 接口传入图片 URL 或 Base64 数据。
+EOF
+            tar -czf "dist/ocr-server-${VERSION}-linux-${ARCH}.tar.gz" -C "${PKG_DIR}" .
+            rm -rf "${PKG_DIR}" "dist/${BIN}"
+          done
+          (cd dist && sha256sum *.tar.gz > SHA256SUMS)
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -80,6 +109,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -92,6 +128,16 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v${{ steps.bump.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.bump.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/ocr:v${{ steps.bump.outputs.version }}
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/ocr:${{ steps.bump.outputs.version }}
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/ocr:latest
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ steps.bump.outputs.version }}"
+          TAG="v${VERSION}"
+          git tag "$TAG"
+          git push origin HEAD:main "$TAG"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -100,5 +146,9 @@ jobs:
           name: v${{ steps.bump.outputs.version }}
           draft: false
           prerelease: false
+          files: |
+            dist/ocr-server-${{ steps.bump.outputs.version }}-linux-amd64.tar.gz
+            dist/ocr-server-${{ steps.bump.outputs.version }}-linux-arm64.tar.gz
+            dist/SHA256SUMS
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
